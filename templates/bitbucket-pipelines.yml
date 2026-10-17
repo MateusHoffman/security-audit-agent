@@ -1,0 +1,18 @@
+# Trecho para bitbucket-pipelines.yml do cliente (pull requests).
+# Ajuste SECURITY_RUNNER_RAW_URL para a URL raw do seu repositório security-runner.
+
+pipelines:
+  pull-requests:
+    "**":
+      - step:
+          name: Zero-Friction Security Audit (OpenCode)
+          image: node:20-slim
+          script:
+            - apt-get update && apt-get install -y curl git
+            - export SECURITY_RUNNER_RAW_URL="${SECURITY_RUNNER_RAW_URL:-https://raw.githubusercontent.com/SEU_USUARIO/security-runner/main}"
+            - curl -fsSL "${SECURITY_RUNNER_RAW_URL}/run_audit.sh" -o run_audit.sh
+            - curl -fsSL "${SECURITY_RUNNER_RAW_URL}/prompt.txt" -o prompt.txt
+            - chmod +x run_audit.sh
+            - ./run_audit.sh
+          artifacts:
+            - security-audit-report.md
