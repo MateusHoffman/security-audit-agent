@@ -1,4 +1,5 @@
 security-audit-report.md
+.env.local
 .agents/
 .opencode/
 opencode.json

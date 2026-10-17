@@ -127,7 +127,6 @@ main() {
     --auto \
     --model "${OPENCODE_MODEL}" \
     --title "security-audit-pr" \
-    --dir "${ROOT_DIR}" \
     "${full_prompt}"
 
   if [[ ! -f "${REPORT_FILE}" ]]; then
