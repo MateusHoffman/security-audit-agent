@@ -10,6 +10,9 @@ jobs:
   security-audit:
     name: Agente de auditoria de segurança
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
     steps:
       - name: Checkout do repositório
         uses: actions/checkout@v4
@@ -32,8 +35,10 @@ jobs:
           chmod +x run_audit.sh
           ./run_audit.sh
 
-      - name: Publicar relatório
-        uses: actions/upload-artifact@v4
+      - name: Comentar relatório no PR
+        if: github.event_name == 'pull_request' && github.event.pull_request.number != ''
+        uses: peter-evans/create-or-update-comment@v4
         with:
-          name: security-audit-report
-          path: security-audit-report.md
+          issue-number: ${{ github.event.pull_request.number }}
+          body-path: security-audit-report.md
+          comment-tag: security-audit-report

@@ -1,6 +1,6 @@
 # Agente de auditoria de segurança
 
-Guia de instalação do **security-audit-agent** no **repositório do seu projeto**. A cada pull request, o CI gera **`security-audit-report.md`** com achados de segurança no código alterado.
+Guia de instalação do **security-audit-agent** no **repositório do seu projeto**. A cada pull request, o CI gera um relatório de segurança e **publica um comentário no PR** com o conteúdo em Markdown (atualiza o mesmo comentário a cada re-run).
 
 Você precisa de uma conta [OpenRouter](https://openrouter.ai/) (API key + créditos). O modelo de IA é configurável; o padrão é econômico e funciona sem secret extra.
 
@@ -11,7 +11,7 @@ Você precisa de uma conta [OpenRouter](https://openrouter.ai/) (API key + créd
 - [ ] Criar API key no OpenRouter
 - [ ] Cadastrar secret/variável no **repo do seu projeto**
 - [ ] Colar o YAML abaixo (GitHub **ou** Bitbucket)
-- [ ] Abrir um PR e baixar o artefato do relatório
+- [ ] Abrir um PR e conferir o comentário do relatório na conversa
 
 ---
 
@@ -68,6 +68,9 @@ jobs:
   security-audit:
     name: Agente de auditoria de segurança
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
     steps:
       - name: Checkout do repositório
         uses: actions/checkout@v4
@@ -90,11 +93,13 @@ jobs:
           chmod +x run_audit.sh
           ./run_audit.sh
 
-      - name: Publicar relatório
-        uses: actions/upload-artifact@v4
+      - name: Comentar relatório no PR
+        if: github.event_name == 'pull_request' && github.event.pull_request.number != ''
+        uses: peter-evans/create-or-update-comment@v4
         with:
-          name: security-audit-report
-          path: security-audit-report.md
+          issue-number: ${{ github.event.pull_request.number }}
+          body-path: security-audit-report.md
+          comment-tag: security-audit-report
 ```
 
 3. Commit e push (ou abra PR só com esse arquivo).
@@ -102,8 +107,8 @@ jobs:
 ### Ver o relatório
 
 1. Abra um **Pull Request** para `main`, `master` ou `develop`.
-2. **Actions** → run **Agente de auditoria de segurança**.
-3. **Artifacts** → `security-audit-report`.
+2. Na aba **Conversation**, procure o comentário do bot (tag `security-audit-report`). Novas execuções **atualizam** o mesmo comentário em vez de criar vários.
+3. Se o job falhar antes de gerar o arquivo, não haverá comentário — veja os logs em **Actions**.
 
 Para outra branch base, altere `branches:` em `on.pull_request`.
 
@@ -171,3 +176,5 @@ pipelines:
 | GitHub: workflow não aparece | Arquivo em `.github/workflows/` na branch do PR |
 | Bitbucket: pipeline não roda | Pipelines ligado + PR aberto + YAML válido |
 | Job falhou | Abra os logs do step e leia a última mensagem de erro |
+| GitHub: comentário não aparece | Job precisa de `permissions.pull-requests: write`; em orgs restritas, libere no workflow ou nas settings do repo |
+| Comentário muito grande | GitHub limita ~65 KB por comentário; reduza escopo do PR ou enxugue o prompt |
