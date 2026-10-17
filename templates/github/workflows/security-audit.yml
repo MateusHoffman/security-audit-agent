@@ -1,7 +1,6 @@
-# Cole em .github/workflows/security-audit.yml no repositório do cliente.
-# Ajuste SECURITY_RUNNER_RAW_URL para a URL raw do seu repositório security-runner.
+# Cole em .github/workflows/security-audit.yml no repositório do seu projeto.
 
-name: Zero-Friction Security Audit (OpenCode)
+name: Agente de auditoria de segurança
 
 on:
   pull_request:
@@ -9,21 +8,22 @@ on:
 
 jobs:
   security-audit:
+    name: Agente de auditoria de segurança
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout Repository
+      - name: Checkout do repositório
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
-      - name: Set up Node.js
+      - name: Node.js
         uses: actions/setup-node@v4
         with:
           node-version: "20"
 
-      - name: Run OpenCode Security Harness
+      - name: Executar agente de auditoria
         env:
-          SECURITY_RUNNER_RAW_URL: https://raw.githubusercontent.com/SEU_USUARIO/security-runner/main
+          SECURITY_RUNNER_RAW_URL: https://raw.githubusercontent.com/MateusHoffman/security-audit-agent/main
           OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
           AI_MODEL: ${{ secrets.AI_MODEL }}
         run: |
@@ -32,7 +32,7 @@ jobs:
           chmod +x run_audit.sh
           ./run_audit.sh
 
-      - name: Upload Security Report Artifact
+      - name: Publicar relatório
         uses: actions/upload-artifact@v4
         with:
           name: security-audit-report

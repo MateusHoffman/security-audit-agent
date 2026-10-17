@@ -1,14 +1,14 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-echo "=== Inicializando Agente de Auditoria (OpenCode) ==="
+echo "=== Agente de auditoria de segurança ==="
 
 ROOT_DIR="${ROOT_DIR:-$(pwd)}"
 cd "$ROOT_DIR"
 
 SKILL_REPO="${SKILL_REPO:-https://github.com/cloudflare/security-audit-skill}"
 SKILL_REF="${SKILL_REF:-main}"
-AI_MODEL="${AI_MODEL:-deepseek/deepseek-chat}"
+AI_MODEL="${AI_MODEL:-deepseek/deepseek-v4.1-flash}"
 OPENCODE_MODEL="openrouter/${AI_MODEL}"
 REPORT_FILE="${REPORT_FILE:-security-audit-report.md}"
 
@@ -115,12 +115,12 @@ main() {
   write_opencode_config
 
   export OPENCODE_DISABLE_AUTOUPDATE=true
-  export OPENCODE_CLIENT=security-runner
+  export OPENCODE_CLIENT=security-audit-agent
 
   local full_prompt
   full_prompt="$(build_prompt "${PROMPT_FILE:-prompt.txt}")"
 
-  echo "=== Executando varredura com ${OPENCODE_MODEL} via OpenCode ==="
+  echo "=== Executando auditoria (modelo ${OPENCODE_MODEL}) ==="
 
   opencode run \
     --standalone \
