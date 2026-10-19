@@ -1,6 +1,6 @@
 # Agente de auditoria de segurança
 
-Guia de instalação do **security-audit-agent** no **repositório do seu projeto**. A cada pull request, o CI gera um relatório de segurança e **publica um comentário no PR** com o conteúdo em Markdown (atualiza o mesmo comentário a cada re-run).
+Guia de instalação do **security-audit-agent** no **repositório do seu projeto**. A cada pull request, o agente segue a skill **security-audit** (Cloudflare); o CI **publica um comentário no PR** com o relatório em **português (pt-BR)** (atualiza o mesmo comentário a cada re-run). O agente não deve gravar arquivos no repositório — só o pipeline usa um artefato efêmero para postar o comentário.
 
 Você precisa de uma conta [OpenRouter](https://openrouter.ai/) (API key + créditos). O modelo de IA é configurável; o padrão é econômico e funciona sem secret extra.
 
@@ -32,6 +32,17 @@ No CI, secret/variável `AI_MODEL` = ID do modelo em [openrouter.ai/models](http
 | `anthropic/claude-sonnet-4` | revisão mais forte |
 | `openai/gpt-4o` | alternativa generalista |
 
+### Escopo da auditoria (`AUDIT_SCOPE`)
+
+Variable no CI do **repositório do seu projeto** (não é secret). Se omitir, vale `pr`.
+
+| Valor | Comportamento em todo PR |
+|--------|---------------------------|
+| `pr` (padrão) | Revisa só o diff do PR |
+| `full` | Audita o repositório inteiro |
+
+Modo `full` consome mais crédito e tempo; use quando quiser baseline do código já existente.
+
 ---
 
 ## 2. Escolha sua plataforma
@@ -45,12 +56,13 @@ Abra só o bloco que você usa.
 
 No **repositório do seu projeto** no GitHub:
 
-**Settings → Secrets and variables → Actions → New repository secret**
+**Settings → Secrets and variables → Actions**
 
-| Name | Obrigatório |
-|------|-------------|
-| `OPENROUTER_API_KEY` | Sim — cole a chave OpenRouter |
-| `AI_MODEL` | Não — ex.: `deepseek/deepseek-v4.1-flash` |
+| Name | Tipo | Obrigatório |
+|------|------|-------------|
+| `OPENROUTER_API_KEY` | Secret | Sim — cole a chave OpenRouter |
+| `AI_MODEL` | Secret | Não — ex.: `deepseek/deepseek-v4.1-flash` |
+| `AUDIT_SCOPE` | Variable | Não — `pr` (padrão) ou `full` |
 
 ### Workflow
 
@@ -87,6 +99,7 @@ jobs:
           SECURITY_RUNNER_RAW_URL: https://raw.githubusercontent.com/MateusHoffman/security-audit-agent/main
           OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
           AI_MODEL: ${{ secrets.AI_MODEL }}
+          AUDIT_SCOPE: ${{ vars.AUDIT_SCOPE }}
         run: |
           curl -fsSL "${SECURITY_RUNNER_RAW_URL}/run_audit.sh" -o run_audit.sh
           curl -fsSL "${SECURITY_RUNNER_RAW_URL}/prompt.txt" -o prompt.txt
@@ -129,6 +142,7 @@ Para outra branch base, altere `branches:` em `on.pull_request`.
 |------|---------|-------------|
 | `OPENROUTER_API_KEY` | Sim ✓ | Sim |
 | `AI_MODEL` | Não | Não |
+| `AUDIT_SCOPE` | Não | Não — `pr` ou `full` |
 
 ### Pipeline
 
@@ -149,6 +163,7 @@ pipelines:
             - curl -fsSL "${SECURITY_RUNNER_RAW_URL}/run_audit.sh" -o run_audit.sh
             - curl -fsSL "${SECURITY_RUNNER_RAW_URL}/prompt.txt" -o prompt.txt
             - chmod +x run_audit.sh
+            - export AUDIT_SCOPE="${AUDIT_SCOPE:-pr}"
             - ./run_audit.sh
           artifacts:
             - security-audit-report.md
@@ -177,4 +192,5 @@ pipelines:
 | Bitbucket: pipeline não roda | Pipelines ligado + PR aberto + YAML válido |
 | Job falhou | Abra os logs do step e leia a última mensagem de erro |
 | GitHub: comentário não aparece | Job precisa de `permissions.pull-requests: write`; em orgs restritas, libere no workflow ou nas settings do repo |
-| Comentário muito grande | GitHub limita ~65 KB por comentário; reduza escopo do PR ou enxugue o prompt |
+| Comentário muito grande | GitHub limita ~65 KB por comentário; use `AUDIT_SCOPE=pr` ou enxugue o prompt |
+| Escopo inválido | `AUDIT_SCOPE` só aceita `pr` ou `full` |

@@ -12,6 +12,7 @@ pipelines:
             - curl -fsSL "${SECURITY_RUNNER_RAW_URL}/run_audit.sh" -o run_audit.sh
             - curl -fsSL "${SECURITY_RUNNER_RAW_URL}/prompt.txt" -o prompt.txt
             - chmod +x run_audit.sh
+            - export AUDIT_SCOPE="${AUDIT_SCOPE:-pr}"
             - ./run_audit.sh
           artifacts:
             - security-audit-report.md

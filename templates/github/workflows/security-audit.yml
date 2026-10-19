@@ -29,6 +29,7 @@ jobs:
           SECURITY_RUNNER_RAW_URL: https://raw.githubusercontent.com/MateusHoffman/security-audit-agent/main
           OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
           AI_MODEL: ${{ secrets.AI_MODEL }}
+          AUDIT_SCOPE: ${{ vars.AUDIT_SCOPE }}
         run: |
           curl -fsSL "${SECURITY_RUNNER_RAW_URL}/run_audit.sh" -o run_audit.sh
           curl -fsSL "${SECURITY_RUNNER_RAW_URL}/prompt.txt" -o prompt.txt

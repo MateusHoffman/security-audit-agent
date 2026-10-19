@@ -11,6 +11,7 @@ SKILL_REF="${SKILL_REF:-main}"
 AI_MODEL="${AI_MODEL:-deepseek/deepseek-v4.1-flash}"
 OPENCODE_MODEL="openrouter/${AI_MODEL}"
 REPORT_FILE="${REPORT_FILE:-security-audit-report.md}"
+AUDIT_SCOPE="${AUDIT_SCOPE:-pr}"
 
 install_opencode() {
   if command -v opencode >/dev/null 2>&1; then
@@ -68,6 +69,17 @@ EOF
   fi
 }
 
+normalize_audit_scope() {
+  AUDIT_SCOPE="$(printf '%s' "${AUDIT_SCOPE}" | tr '[:upper:]' '[:lower:]')"
+  case "${AUDIT_SCOPE}" in
+    pr | full) ;;
+    *)
+      echo "Erro: AUDIT_SCOPE deve ser 'pr' ou 'full' (valor: ${AUDIT_SCOPE})." >&2
+      exit 1
+      ;;
+  esac
+}
+
 detect_pr_context() {
   PR_CONTEXT=""
   if [[ -n "${GITHUB_BASE_REF:-}" ]]; then
@@ -77,27 +89,64 @@ detect_pr_context() {
   fi
 }
 
+audit_scope_ci_note() {
+  if [[ "${AUDIT_SCOPE}" == "full" ]]; then
+    echo '- AUDIT_SCOPE=full: pedido explícito de auditoria completa do codebase (full audit mode na skill).'
+  else
+    echo '- AUDIT_SCOPE=pr: scoped run na skill limitado ao diff deste pull request (merge-base com a branch base quando aplicável).'
+  fi
+}
+
 build_prompt() {
   local prompt_file="${1:-prompt.txt}"
   if [[ ! -f "$prompt_file" ]]; then
     echo "Erro: arquivo de prompt não encontrado: $prompt_file" >&2
     exit 1
   fi
-  local base_prompt
+  local base_prompt scope_note
   base_prompt="$(cat "$prompt_file")"
+  scope_note="$(audit_scope_ci_note)"
   detect_pr_context
   cat <<EOF
 ${base_prompt}
 
 ---
-Contexto de execução (CI):
-- Diretório alvo (repositório): ${ROOT_DIR}
-- Relatório final obrigatório: ${ROOT_DIR}/${REPORT_FILE}
+Contexto de execução (CI) — parâmetros factuais de entrega; metodologia e evidências seguem a skill:
+- Repositório alvo: ${ROOT_DIR}
 - Modelo: ${OPENCODE_MODEL}
+${scope_note}
 ${PR_CONTEXT:+- ${PR_CONTEXT}}
-- Priorize o diff do PR (merge-base com a branch base) quando houver alterações versionadas.
-- Ao concluir, garanta que ${REPORT_FILE} exista na raiz do repositório com resumo executivo, achados por severidade e recomendações.
+- Idioma do comentário no PR: português do Brasil (pt-BR).
+- Entrega: produza o relatório conforme a skill nesse idioma. O pipeline publica o conteúdo como comentário no pull request; não crie arquivos dentro do repositório alvo e não faça commit.
 EOF
+}
+
+collect_report_for_pr_comment() {
+  local skill_root="${HOME}/security-audit-skill"
+  local report_path=""
+
+  if [[ -d "${skill_root}" ]]; then
+    report_path="$(
+      find "${skill_root}" -name REPORT.md -type f -printf '%T@ %p\n' 2>/dev/null \
+        | sort -rn \
+        | head -1 \
+        | cut -d' ' -f2-
+    )"
+  fi
+
+  if [[ -n "${report_path}" && -f "${report_path}" ]]; then
+    cp "${report_path}" "${REPORT_FILE}"
+    echo "Relatório da skill preparado em ${REPORT_FILE} para publicação no PR (arquivo efêmero do job)."
+    return 0
+  fi
+
+  if [[ -f "${REPORT_FILE}" ]]; then
+    echo "Aviso: ${REPORT_FILE} encontrado no workspace; prefira os artefatos da skill em ${skill_root}." >&2
+    return 0
+  fi
+
+  echo "Erro: nenhum REPORT.md da skill encontrado (esperado sob ${skill_root}/...)." >&2
+  exit 1
 }
 
 require_openrouter_key() {
@@ -109,6 +158,8 @@ require_openrouter_key() {
 }
 
 main() {
+  normalize_audit_scope
+  echo "Escopo da auditoria: ${AUDIT_SCOPE}"
   require_openrouter_key
   install_opencode
   install_security_audit_skill
@@ -120,21 +171,18 @@ main() {
   local full_prompt
   full_prompt="$(build_prompt "${PROMPT_FILE:-prompt.txt}")"
 
-  echo "=== Executando auditoria (modelo ${OPENCODE_MODEL}) ==="
+  echo "=== Executando auditoria (modelo ${OPENCODE_MODEL}, escopo ${AUDIT_SCOPE}) ==="
 
   opencode run \
     --standalone \
     --auto \
     --model "${OPENCODE_MODEL}" \
-    --title "security-audit-pr" \
+    --title "security-audit-${AUDIT_SCOPE}" \
     "${full_prompt}"
 
-  if [[ ! -f "${REPORT_FILE}" ]]; then
-    echo "Aviso: ${REPORT_FILE} não foi gerado. Verifique os logs do OpenCode acima." >&2
-    exit 1
-  fi
+  collect_report_for_pr_comment
 
-  echo "=== Auditoria concluída: ${REPORT_FILE} ==="
+  echo "=== Auditoria concluída (comentário no PR via pipeline) ==="
 }
 
 main "$@"
